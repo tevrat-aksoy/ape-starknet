@@ -8,6 +8,8 @@ from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.cairo.common.uint256 import Uint256
 from starkware.starknet.common.syscalls import get_caller_address
 
+from IERC20 import IERC20
+
 struct ComplexStruct {
     timestamp: felt,
     value0: Uint256,
@@ -15,31 +17,35 @@ struct ComplexStruct {
 }
 
 @storage_var
-func balance(user : felt) -> (res : felt) {
+func balance(user: felt) -> (res: felt) {
 }
 
 @storage_var
-func last_sum() -> (sum : felt) {
+func last_sum() -> (sum: felt) {
 }
 
 @storage_var
-func is_initialized() -> (initialized : felt) {
+func is_initialized() -> (initialized: felt) {
 }
 
 @storage_var
-func array_get_counter() -> (res : felt) {
+func array_get_counter() -> (res: felt) {
 }
 
 @event
-func balance_increased(amount : felt) {
+func balance_increased(amount: felt) {
+}
+
+@event
+func TokenEvent(token: felt) {
 }
 
 @storage_var
-func complex_structs(index : felt) -> (res : ComplexStruct) {
+func complex_structs(index: felt) -> (res: ComplexStruct) {
 }
 
 @external
-func initialize{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() {
+func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
     let (initialized) = is_initialized.read();
     with_attr error_message("Already initialized") {
         assert initialized = FALSE;
@@ -50,15 +56,22 @@ func initialize{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_pt
 }
 
 @external
-func reset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() {
+func fireTokenEvent{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(token: felt) {
+    IERC20.fire_events(token, 10000000, Uint256(100, 0), Uint256(200, 0));
+    TokenEvent.emit(token);
+    return ();
+}
+
+@external
+func reset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
     is_initialized.write(FALSE);
     return ();
 }
 
 // Increases the balance by the given amount.
 @external
-func increase_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    user : felt, amount : felt
+func increase_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    user: felt, amount: felt
 ) -> (balance: felt) {
     let (initialized) = is_initialized.read();
     assert initialized = TRUE;
@@ -73,8 +86,8 @@ func increase_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 // Increases the balance of the given user by the given amount.
 @external
 func increase_balance_signed{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
-}(public_key : felt, user : felt, amount : felt, sig : (felt, felt)) {
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
+}(public_key: felt, user: felt, amount: felt, sig: (felt, felt)) {
     // Compute the hash of the message.
     // The hash of (x, 0) is equivalent to the hash of (x).
     let (amount_hash) = hash2{hash_ptr=pedersen_ptr}(amount, 0);
@@ -91,16 +104,16 @@ func increase_balance_signed{
 
 // Returns the current balance.
 @view
-func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    user : felt
-) -> (res : felt) {
+func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(user: felt) -> (
+    res: felt
+) {
     let (res) = balance.read(user=user);
     return (res=res);
 }
 
 @external
-func store_sum{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    arr_len : felt, arr : felt*
+func store_sum{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    arr_len: felt, arr: felt*
 ) -> (sum: felt) {
     let (calc) = array_sum(arr_len, arr);
     last_sum.write(calc);
@@ -108,12 +121,14 @@ func store_sum{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }
 
 @external
-func get_caller{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (caller: felt) {
+func get_caller{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    caller: felt
+) {
     let (caller) = get_caller_address();
     return (caller=caller);
 }
 
-func array_sum(arr_len : felt, arr : felt*) -> (felt) {
+func array_sum(arr_len: felt, arr: felt*) -> (felt,) {
     if (arr_len == 0) {
         return (sum=0);
     }
@@ -124,19 +139,19 @@ func array_sum(arr_len : felt, arr : felt*) -> (felt) {
 }
 
 @view
-func get_last_sum{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
+func get_last_sum{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
 ) {
     let (res) = last_sum.read();
     return (res=res);
 }
 
 @external
-func store_complex_struct{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    complex_struct : ComplexStruct
-) -> (res : ComplexStruct) {
+func store_complex_struct{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    complex_struct: ComplexStruct
+) -> (res: ComplexStruct) {
     complex_structs.write(0, complex_struct);
-    let (stored_complex_struct : ComplexStruct) = complex_structs.read(0);
+    let (stored_complex_struct: ComplexStruct) = complex_structs.read(0);
     return (res=stored_complex_struct);
 }
 
@@ -150,8 +165,8 @@ func store_complex_struct{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
 //
 
 @external
-func array_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    arr_len : felt, arr : felt*
+func array_external{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    arr_len: felt, arr: felt*
 ) {
     const ARRAY_SIZE = 3;
     let (ptr) = alloc();
@@ -164,8 +179,8 @@ func array_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 }
 
 @view
-func array_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    arr_len : felt, arr : felt*
+func array_view{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    arr_len: felt, arr: felt*
 ) {
     const ARRAY_SIZE = 3;
     let (ptr) = alloc();
@@ -178,9 +193,8 @@ func array_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_pt
 }
 
 @external
-func array_complex_struct_external{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}() -> (complex_structs_len : felt, complex_structs : ComplexStruct*) {
+func array_complex_struct_external{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ) -> (complex_structs_len: felt, complex_structs: ComplexStruct*) {
     let value0 = Uint256(123, 0);
     let value1 = Uint256(0, 123);
     let zero = Uint256(0, 0);
@@ -189,7 +203,7 @@ func array_complex_struct_external{
     let my_struct2 = ComplexStruct(2, zero, zero);
 
     alloc_locals;
-    let (local complex_structs : ComplexStruct*) = alloc();
+    let (local complex_structs: ComplexStruct*) = alloc();
     assert complex_structs[0] = my_struct0;
     assert complex_structs[1] = my_struct1;
     assert complex_structs[2] = my_struct2;
@@ -197,8 +211,8 @@ func array_complex_struct_external{
 }
 
 @view
-func array_complex_struct_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ) -> (complex_structs_len : felt, complex_structs : ComplexStruct*) {
+func array_complex_struct_view{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ) -> (complex_structs_len: felt, complex_structs: ComplexStruct*) {
     let value0 = Uint256(123, 0);
     let value1 = Uint256(0, 123);
     let zero = Uint256(0, 0);
@@ -207,7 +221,7 @@ func array_complex_struct_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     let my_struct2 = ComplexStruct(2, zero, zero);
 
     alloc_locals;
-    let (local complex_structs : ComplexStruct*) = alloc();
+    let (local complex_structs: ComplexStruct*) = alloc();
     assert complex_structs[0] = my_struct0;
     assert complex_structs[1] = my_struct1;
     assert complex_structs[2] = my_struct2;
@@ -215,10 +229,11 @@ func array_complex_struct_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 }
 
 @external
-func array_uint256_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ) -> (amounts_len : felt, amounts : Uint256*) {
+func array_uint256_external{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    amounts_len: felt, amounts: Uint256*
+) {
     alloc_locals;
-    let (local amounts : Uint256*) = alloc();
+    let (local amounts: Uint256*) = alloc();
     assert amounts[0] = Uint256(123, 0);
     assert amounts[1] = Uint256(0, 123);
     assert amounts[2] = Uint256(0, 0);
@@ -226,11 +241,11 @@ func array_uint256_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
 }
 
 @view
-func array_uint256_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    amounts_len : felt, amounts : Uint256*
+func array_uint256_view{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    amounts_len: felt, amounts: Uint256*
 ) {
     alloc_locals;
-    let (local amounts : Uint256*) = alloc();
+    let (local amounts: Uint256*) = alloc();
     assert amounts[0] = Uint256(123, 0);
     assert amounts[1] = Uint256(0, 123);
     assert amounts[2] = Uint256(0, 0);
@@ -238,7 +253,7 @@ func array_uint256_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
 }
 
 @external
-func complex_struct_external() -> (res : ComplexStruct) {
+func complex_struct_external() -> (res: ComplexStruct) {
     let value0 = Uint256(123, 0);
     let value1 = Uint256(0, 123);
     let res = ComplexStruct(1234, value0, value1);
@@ -246,7 +261,7 @@ func complex_struct_external() -> (res : ComplexStruct) {
 }
 
 @view
-func complex_struct_view() -> (res : ComplexStruct) {
+func complex_struct_view() -> (res: ComplexStruct) {
     let value0 = Uint256(123, 0);
     let value1 = Uint256(0, 123);
     let res = ComplexStruct(1234, value0, value1);
@@ -254,37 +269,37 @@ func complex_struct_view() -> (res : ComplexStruct) {
 }
 
 @external
-func felt_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
+func felt_external{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
 ) {
     return (res=2);
 }
 
 @view
-func felt_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (res : felt) {
+func felt_view{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (res: felt) {
     return (res=2);
 }
 
 @external
-func mix_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    start : felt,
-    arr_len : felt,
-    arr : felt*,
-    some_uint256 : Uint256,
-    arr2_len : felt,
-    arr2 : felt*,
-    suffix : felt,
-    last_uint256 : Uint256,
+func mix_external{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    start: felt,
+    arr_len: felt,
+    arr: felt*,
+    some_uint256: Uint256,
+    arr2_len: felt,
+    arr2: felt*,
+    suffix: felt,
+    last_uint256: Uint256,
 ) {
     alloc_locals;
 
-    let (local arr : felt*) = alloc();
+    let (local arr: felt*) = alloc();
     assert arr[0] = 3;
     assert arr[1] = 4;
 
     let some_uint256 = Uint256(123, 0);
 
-    let (local arr2 : felt*) = alloc();
+    let (local arr2: felt*) = alloc();
     assert arr2[0] = 8;
     assert arr2[1] = 9;
     assert arr2[2] = 10;
@@ -304,25 +319,25 @@ func mix_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 }
 
 @view
-func mix_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    start : felt,
-    arr_len : felt,
-    arr : felt*,
-    some_uint256 : Uint256,
-    arr2_len : felt,
-    arr2 : felt*,
-    suffix : felt,
-    last_uint256 : Uint256,
+func mix_view{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    start: felt,
+    arr_len: felt,
+    arr: felt*,
+    some_uint256: Uint256,
+    arr2_len: felt,
+    arr2: felt*,
+    suffix: felt,
+    last_uint256: Uint256,
 ) {
     alloc_locals;
 
-    let (local arr : felt*) = alloc();
+    let (local arr: felt*) = alloc();
     assert arr[0] = 3;
     assert arr[1] = 4;
 
     let some_uint256 = Uint256(123, 0);
 
-    let (local arr2 : felt*) = alloc();
+    let (local arr2: felt*) = alloc();
     assert arr2[0] = 8;
     assert arr2[1] = 9;
     assert arr2[2] = 10;
@@ -342,24 +357,24 @@ func mix_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 }
 
 @external
-func uint256_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : Uint256
+func uint256_external{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: Uint256
 ) {
     let res = Uint256(1, 0);
     return (res=res);
 }
 
 @view
-func uint256_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : Uint256
+func uint256_view{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: Uint256
 ) {
     let res = Uint256(1, 0);
     return (res=res);
 }
 
 @external
-func uint256s_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res1 : Uint256, res2 : Uint256, res3 : Uint256
+func uint256s_external{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res1: Uint256, res2: Uint256, res3: Uint256
 ) {
     let res1 = Uint256(123, 0);
     let res2 = Uint256(0, 123);
@@ -368,8 +383,8 @@ func uint256s_external{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 }
 
 @view
-func uint256s_view{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res1 : Uint256, res2 : Uint256, res3 : Uint256
+func uint256s_view{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res1: Uint256, res2: Uint256, res3: Uint256
 ) {
     let res1 = Uint256(123, 0);
     let res2 = Uint256(0, 123);

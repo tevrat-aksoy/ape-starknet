@@ -277,3 +277,20 @@ def test_estimate_gas_cost_view_method(contract, account, provider):
 def test_estimate_gas_cost_view_method_2(contract, account):
     estimated_fee = contract.get_balance.estimate_gas_cost(account, sender=account)
     assert estimated_fee > 100_000_000_000_000
+
+
+def test_token_event(token_contract, account, contract):
+
+    receipt = contract.fireTokenEvent(token_contract.address, sender=account)
+    print(receipt)
+
+    print("contract event")
+    logs_contract_events = list(receipt.decode_logs(contract.TokenEvent))
+    print(logs_contract_events)
+
+    print("token event")
+    logs_transfer = list(receipt.decode_logs(token_contract.Transfer))
+    print(logs_transfer)
+
+    logs_mint = list(receipt.decode_logs(token_contract.Mint))
+    print(logs_mint)
