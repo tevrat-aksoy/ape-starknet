@@ -387,9 +387,6 @@ class BaseStarknetAccount(AccountAPI, StarknetBase):
         if send_everything:
             raise NotImplementedError("send_everything currently isn't implemented in Starknet.")
 
-        if not isinstance(txn, InvokeFunctionTransaction):
-            raise AccountsError("Can only call Starknet invoke transactions.")
-
         txn = self.prepare_transaction(txn)
         if not txn.signature:
             raise SignatureError("The transaction was not signed.")
